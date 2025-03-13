@@ -97,7 +97,7 @@ leaflet() %>%
 mba_raw_assigned <- as.data.frame(mba_raw_sf)
 
 # Save as a CSV file
-write.csv(mba_raw_assigned, file = here::here(datout, "mba_hawkins_merged.csv"), row.names = FALSE)
+write.csv(mba_raw_assigned, file = here::here(datout, "mba_hawkins_merged.csv"), row.names = FALSE) #last write 13 Mar 2025
 
 
 
