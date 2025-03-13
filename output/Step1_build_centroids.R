@@ -38,43 +38,66 @@ site_centroids <- otter_raw %>%
   )
 
 ################################################################################
-# visualize Hawkins data and MBA data
+# calculate centroids and assign 200m buffer
 
 # Convert site centroids to an sf object
 site_centroids_sf <- st_as_sf(site_centroids, coords = c("centroid_long", "centroid_lat"), crs = 4326)
 
-# Convert MBA raw data points to an sf object
-mba_points_sf <- st_as_sf(mba_raw, coords = c("long", "lat"), crs = 4326)
+# Convert mba_raw to an sf object
+mba_raw_sf <- st_as_sf(mba_raw, coords = c("long", "lat"), crs = 4326)
 
-# Create an interactive leaflet map
+# Create a 200m buffer around each site centroid
+site_buffers <- st_buffer(site_centroids_sf, dist = 200)  # Distance in meters
+
+# Perform spatial join to assign site names to points within the buffer
+mba_raw_sf <- st_join(mba_raw_sf, site_buffers["site"], left = TRUE)
+
+# Filter for points that were successfully assigned to a site (inside 200m buffer)
+mba_filtered_sf <- mba_raw_sf %>% filter(!is.na(site))
+
+################################################################################
+# visualize
+
+# Create the interactive leaflet map
 leaflet() %>%
   addProviderTiles(providers$Esri.WorldImagery) %>%  
-  # Add site centroids (red)
+  
+  # Add hawkins site centroids (Red)
   addCircleMarkers(data = site_centroids_sf, 
                    radius = 6, color = "red", fillOpacity = 0.8, stroke = FALSE,
-                   popup = ~site, group = "Centroids") %>%  
-  # Add MBA data points (blue)
-  addCircleMarkers(data = mba_points_sf, 
+                   popup = ~site, group = "Centroids") %>%
+  
+  # Add all MBA observations (Blue)
+  addCircleMarkers(data = mba_raw_sf, 
                    radius = 3, color = "blue", fillOpacity = 0.5, stroke = FALSE,
                    popup = ~paste("Date:", date, "<br>Prey:", prey, "<br>Number:", number), 
-                   group = "MBA Observations") %>%
+                   group = "All MBA Observations") %>%
+  
+  # Add filtered MBA observations (Green)
+  addCircleMarkers(data = mba_filtered_sf, 
+                   radius = 3, color = "orange", fillOpacity = 0.7, stroke = FALSE,
+                   popup = ~paste("Site:", site, "<br>Date:", date, "<br>Prey:", prey, "<br>Number:", number), 
+                   group = "Filtered MBA Observations") %>%
+  
   # Add toggle
   addLayersControl(
-    overlayGroups = c("Centroids", "MBA Observations"),
+    overlayGroups = c("Centroids", "All MBA Observations", "Filtered MBA Observations"),
     options = layersControlOptions(collapsed = FALSE)
   ) %>%
+  
   # Center the map on the average coordinates of the data
   setView(lng = mean(site_centroids$centroid_long), 
           lat = mean(site_centroids$centroid_lat), 
           zoom = 10)  
 
-
 ################################################################################
-# assign mba_raw points to hawkins centroids
+# export
 
+# Convert the sf object back to a data frame
+mba_raw_assigned <- as.data.frame(mba_raw_sf)
 
-
-
+# Save as a CSV file
+write.csv(mba_raw_assigned, file = here::here(datout, "mba_hawkins_merged.csv"), row.names = FALSE)
 
 
 
